@@ -4,7 +4,6 @@
     package="com.example.cameralink">
 
     <uses-permission android:name="android.permission.CAMERA" />
-    <uses-sdk android:minSdkVersion="29" android:targetSdkVersion="34" />
 
     <uses-feature android:name="android.hardware.camera" />
     <uses-feature android:name="android.hardware.camera.any" />
