@@ -47,6 +47,7 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     implementation(libs.material) // Matches TOML key "material"
+    implementation(libs.androidx.material3)
     implementation(libs.constraintlayout) // Matches TOML key "constraintlayout"
     implementation(libs.lifecycle.runtime.ktx) // Matches TOML key "lifecycle-runtime-ktx"
 
