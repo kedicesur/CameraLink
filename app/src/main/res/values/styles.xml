@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Base button style -->
+    <style name="Widget.CameraLink.CircularButton" parent="Widget.Material3.Button">
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+        <item name="android:padding">8dp</item>
+        <item name="iconSize">32dp</item>
+        <item name="strokeColor">@color/teal_700</item>
+        <item name="strokeWidth">1dp</item>
+        <item name="backgroundTint">@color/surface_container</item>
+        <item name="shapeAppearanceOverlay">@style/ShapeAppearanceOverlay.CameraLink.Circle</item>
+    </style>
+
+    <!-- Power button specific style -->
+    <style name="Widget.CameraLink.PowerButton" parent="Widget.CameraLink.CircularButton">
+        <item name="icon">@drawable/ic_power</item>
+        <item name="iconTint">@color/power_button_tint</item>
+    </style>
+
+    <!-- Flip button specific style -->
+    <style name="Widget.CameraLink.FlipButton" parent="Widget.CameraLink.CircularButton">
+        <item name="icon">@drawable/ic_flip</item>
+        <item name="iconTint">@color/flip_button_tint</item>
+    </style>
+
+    <!-- Shape appearance -->
+    <style name="ShapeAppearanceOverlay.CameraLink.Circle" parent="ShapeAppearance.Material3.Corner.Full">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">50%</item>
+    </style>
+</resources>

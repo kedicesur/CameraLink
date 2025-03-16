@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">CameraLink</string>
+    <string name="power_button_desc">Camera Power Button</string>
+    <string name="flip_button_desc">Flip Camera Button</string>
+</resources>
