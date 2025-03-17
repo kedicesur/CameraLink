@@ -5,12 +5,12 @@ plugins {
 
 android {
     namespace = "com.example.cameralink"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.example.cameralink"
         minSdk = 29
-        targetSdk = 34
+        targetSdk = 35
         versionCode = 1
         versionName = "1.0"
     }

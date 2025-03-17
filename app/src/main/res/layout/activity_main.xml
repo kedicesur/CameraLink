@@ -18,7 +18,7 @@
         android:id="@+id/controlPanel"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:padding="12dp"
+        android:padding="@dimen/panel_padding"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
@@ -26,8 +26,8 @@
         <com.google.android.material.button.MaterialButton
             android:id="@+id/powerButton"
             style="@style/Widget.CameraLink.PowerButton"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
+            android:layout_width="@dimen/button_size"
+            android:layout_height="@dimen/button_size"
             android:contentDescription="@string/power_button_desc"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toStartOf="@id/flipButton"
@@ -37,8 +37,8 @@
         <com.google.android.material.button.MaterialButton
             android:id="@+id/flipButton"
             style="@style/Widget.CameraLink.FlipButton"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
+            android:layout_width="@dimen/button_size"
+            android:layout_height="@dimen/button_size"
             android:contentDescription="@string/flip_button_desc"
             app:layout_constraintStart_toEndOf="@id/powerButton"
             app:layout_constraintEnd_toEndOf="parent"

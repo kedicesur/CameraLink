@@ -17,27 +17,28 @@
     <LinearLayout
         android:id="@+id/controlPanel"
         android:layout_width="wrap_content"
-        android:layout_height="0dp"
+        android:layout_height="wrap_content"
         android:orientation="vertical"
         android:gravity="center"
-        android:padding="12dp"
+        android:padding="@dimen/panel_padding"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintBottom_toBottomOf="parent">
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintVertical_bias="0.5">
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/powerButton"
             style="@style/Widget.CameraLink.PowerButton"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:layout_marginBottom="96dp"
+            android:layout_width="@dimen/button_size"
+            android:layout_height="@dimen/button_size"
+            android:layout_marginBottom="@dimen/button_margin_bottom"
             android:contentDescription="@string/power_button_desc"/>
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/flipButton"
             style="@style/Widget.CameraLink.FlipButton"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
+            android:layout_width="@dimen/button_size"
+            android:layout_height="@dimen/button_size"
             android:contentDescription="@string/flip_button_desc"/>
 
     </LinearLayout>

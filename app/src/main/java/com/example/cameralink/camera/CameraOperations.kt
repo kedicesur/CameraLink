@@ -15,9 +15,7 @@ class CameraOperations(
     private val lifecycleOwner: LifecycleOwner
 ) {
     var isCameraEnabled = false
-        private set
     var isFrontCamera = false
-        private set
 
     private var cameraProvider: ProcessCameraProvider? = null
     private val cameraExecutor = Executors.newSingleThreadExecutor()
@@ -32,7 +30,7 @@ class CameraOperations(
         startCamera(previewView)
     }
 
-    private fun startCamera(previewView: PreviewView) {
+    fun startCamera(previewView: PreviewView) {
         val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
         cameraProviderFuture.addListener({
             cameraProvider = cameraProviderFuture.get()
