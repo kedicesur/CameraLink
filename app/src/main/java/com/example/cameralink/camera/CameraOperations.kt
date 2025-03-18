@@ -2,8 +2,7 @@ package com.example.cameralink.camera
 
 import android.content.Context
 import android.util.Log
-import androidx.camera.core.CameraSelector
-import androidx.camera.core.Preview
+import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
@@ -17,6 +16,7 @@ class CameraOperations(
     var isCameraEnabled = false
     var isFrontCamera = false
 
+    private var camera: Camera? = null
     private var cameraProvider: ProcessCameraProvider? = null
     private val cameraExecutor = Executors.newSingleThreadExecutor()
 
@@ -46,7 +46,7 @@ class CameraOperations(
 
             try {
                 cameraProvider?.unbindAll()
-                cameraProvider?.bindToLifecycle(
+                camera = cameraProvider?.bindToLifecycle(
                     lifecycleOwner,
                     cameraSelector,
                     preview
@@ -55,6 +55,15 @@ class CameraOperations(
                 Log.e("CameraOperations", "Camera start failed", e)
             }
         }, ContextCompat.getMainExecutor(context))
+    }
+
+    fun adjustZoom(scaleFactor: Float) {
+        camera?.let {
+            val currentZoomRatio = it.cameraInfo.zoomState.value?.zoomRatio ?: 1f
+            val maxZoom = it.cameraInfo.zoomState.value?.maxZoomRatio ?: 5f
+            val newZoomRatio = (currentZoomRatio * scaleFactor).coerceIn(1f, maxZoom)
+            it.cameraControl.setZoomRatio(newZoomRatio)
+        }
     }
 
     private fun shutdownCamera() {

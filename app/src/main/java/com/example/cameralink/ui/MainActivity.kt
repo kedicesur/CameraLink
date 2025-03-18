@@ -3,6 +3,8 @@ package com.example.cameralink.ui
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.view.GestureDetector
+import android.view.MotionEvent
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -40,6 +42,7 @@ class MainActivity : AppCompatActivity() {
         binding.powerButton.setOnClickListener { handlePowerButton() }
         binding.flipButton.setOnClickListener { handleFlipButton() }
 
+        setupGestureDetector()
         updateButtonStates()
 
         // Restart camera if it was enabled
@@ -47,6 +50,36 @@ class MainActivity : AppCompatActivity() {
             cameraOperations.startCamera(binding.previewView)
         }
     }
+
+    private fun setupGestureDetector() {
+        val gestureDetector = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
+            override fun onDown(e: MotionEvent): Boolean {
+                return true // Required to ensure gestures are detected
+            }
+
+            override fun onScroll(
+                e1: MotionEvent?, e2: MotionEvent,
+                distanceX: Float, distanceY: Float
+            ): Boolean {
+                if (e1 == null) return false
+
+                val zoomFactor = if (distanceY > 5) 1.025f else if (distanceY < -5) 0.975f else 1f
+                cameraOperations.adjustZoom(zoomFactor)
+                return true
+            }
+        })
+
+        binding.previewView.setOnTouchListener { view, event ->
+            if (gestureDetector.onTouchEvent(event)) {
+                return@setOnTouchListener true
+            }
+            if (event.action == MotionEvent.ACTION_UP) {
+                view.performClick() // Ensures accessibility compliance
+            }
+            false
+        }
+    }
+
 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
