@@ -22,7 +22,10 @@ class CameraOperations(
 
     fun toggleCameraState(previewView: PreviewView) {
         isCameraEnabled = !isCameraEnabled
-        if (isCameraEnabled) startCamera(previewView) else shutdownCamera()
+        if (isCameraEnabled) startCamera(previewView) else {
+            shutdownCamera()
+            shutdown()
+        }
     }
 
     fun switchCameraType(previewView: PreviewView) {
@@ -34,6 +37,8 @@ class CameraOperations(
         val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
         cameraProviderFuture.addListener({
             cameraProvider = cameraProviderFuture.get()
+            cameraProvider?.unbindAll() // Ensure previous session is closed
+
             val cameraSelector = if (isFrontCamera) {
                 CameraSelector.DEFAULT_FRONT_CAMERA
             } else {
@@ -45,7 +50,6 @@ class CameraOperations(
             }
 
             try {
-                cameraProvider?.unbindAll()
                 camera = cameraProvider?.bindToLifecycle(
                     lifecycleOwner,
                     cameraSelector,

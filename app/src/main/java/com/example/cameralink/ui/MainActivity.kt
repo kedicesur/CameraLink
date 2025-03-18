@@ -46,8 +46,10 @@ class MainActivity : AppCompatActivity() {
         updateButtonStates()
 
         // Restart camera if it was enabled
-        if (cameraOperations.isCameraEnabled) {
+        if (cameraOperations.isCameraEnabled && hasCameraPermission()) {
             cameraOperations.startCamera(binding.previewView)
+        } else {
+            requestPermissionLauncher.launch(Manifest.permission.CAMERA)
         }
     }
 
@@ -63,8 +65,7 @@ class MainActivity : AppCompatActivity() {
             ): Boolean {
                 if (e1 == null) return false
 
-                val zoomFactor = if (distanceY > 5) 1.025f else if (distanceY < -5) 0.975f else 1f
-                cameraOperations.adjustZoom(zoomFactor)
+                cameraOperations.adjustZoom(1 + distanceY / 500)
                 return true
             }
         })
@@ -92,12 +93,17 @@ class MainActivity : AppCompatActivity() {
         if (hasCameraPermission()) {
             toggleCameraState()
         } else {
+            if (shouldShowRequestPermissionRationale(Manifest.permission.CAMERA)) {
+                showPermissionWarning() // Explain why permission is needed
+            }
             requestPermissionLauncher.launch(Manifest.permission.CAMERA)
         }
     }
 
     private fun handleFlipButton() {
-        cameraOperations.switchCameraType(binding.previewView)
+        if (cameraOperations.isCameraEnabled) {
+            cameraOperations.switchCameraType(binding.previewView)
+        }
     }
 
     private fun toggleCameraState() {
@@ -106,8 +112,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateButtonStates() {
-        binding.powerButton.isActivated = cameraOperations.isCameraEnabled
-        binding.flipButton.isEnabled = cameraOperations.isCameraEnabled
+        runOnUiThread {
+            binding.powerButton.isActivated = cameraOperations.isCameraEnabled
+            binding.flipButton.isEnabled = cameraOperations.isCameraEnabled
+        }
     }
 
     private fun hasCameraPermission() =
