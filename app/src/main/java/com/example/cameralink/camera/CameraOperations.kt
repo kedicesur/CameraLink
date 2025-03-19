@@ -2,7 +2,6 @@ package com.example.cameralink.camera
 
 import android.content.Context
 import android.util.Log
-import android.view.View
 import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
@@ -20,17 +19,8 @@ class CameraOperations(
     private var cameraProvider: ProcessCameraProvider? = null
     private val cameraExecutor = Executors.newSingleThreadExecutor()
 
-    fun toggleCameraState(previewView: PreviewView) {
-        val isEnabled = cameraViewModel.isCameraEnabled.value ?: false
-        cameraViewModel.toggleCameraEnabled() // Update ViewModel state
-
-        if (!isEnabled) {
-            previewView.visibility = View.VISIBLE
-            startCamera(previewView)
-        } else {
-            previewView.visibility = View.INVISIBLE
-            shutdownCamera()
-        }
+    fun toggleCameraState() {
+        cameraViewModel.toggleCameraEnabled() // UI/camera handled by observer
     }
 
     private fun bindCameraPreview(previewView: PreviewView) {
@@ -61,8 +51,10 @@ class CameraOperations(
     }
 
     fun switchCameraType(previewView: PreviewView) {
-        cameraViewModel.toggleFrontCamera() // Update ViewModel state
-        bindCameraPreview(previewView) // Restart preview with the new camera type
+        if (cameraProvider != null) {
+            cameraViewModel.toggleFrontCamera()
+            bindCameraPreview(previewView)
+        }
     }
 
     fun startCamera(previewView: PreviewView) {

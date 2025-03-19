@@ -28,6 +28,7 @@ class MainActivity : AppCompatActivity() {
         if (permissions[Manifest.permission.CAMERA] == true) {
             startCameraIfEnabled()
         } else {
+            cameraViewModel.setCameraEnabled(false)  // Force-disable camera
             showPermissionWarning()
         }
     }
@@ -39,7 +40,7 @@ class MainActivity : AppCompatActivity() {
 
         cameraOperations = CameraOperations(this, this, cameraViewModel)
 
-        binding.powerButton.setOnClickListener { cameraOperations.toggleCameraState(binding.previewView) }
+        binding.powerButton.setOnClickListener { cameraOperations.toggleCameraState() }
         binding.flipButton.setOnClickListener { handleFlipButton() }
 
         setupGestureDetector()
@@ -83,8 +84,9 @@ class MainActivity : AppCompatActivity() {
                 e1: MotionEvent?, e2: MotionEvent,
                 distanceX: Float, distanceY: Float
             ): Boolean {
-                if (e1 == null) return false
-                val zoomFactor = 1f + distanceY / 500f // Adjust zoom based on swipe direction
+                if (e1 == null || cameraViewModel.isCameraEnabled.value != true) return false
+                val sensitivity = binding.previewView.height.toFloat()
+                val zoomFactor = 1f + distanceY / sensitivity // Adjust zoom based on swipe direction
                 cameraOperations.adjustZoom(zoomFactor)
                 return true
             }
@@ -108,10 +110,8 @@ class MainActivity : AppCompatActivity() {
 
 
     private fun updateButtonStates() {
-        runOnUiThread {
             binding.powerButton.isActivated = cameraViewModel.isCameraEnabled.value == true
             binding.flipButton.isEnabled = cameraViewModel.isCameraEnabled.value == true
-        }
     }
 
     private fun hasCameraPermission(): Boolean =

@@ -10,11 +10,11 @@ class CameraViewModel : ViewModel() {
 
     private val _isFrontCamera = MutableLiveData(false)
     val isFrontCamera: LiveData<Boolean> = _isFrontCamera
-/*
+
     fun setCameraEnabled(enabled: Boolean) {
         _isCameraEnabled.value = enabled
     }
-*/
+
     fun toggleCameraEnabled() {
         _isCameraEnabled.value = _isCameraEnabled.value != true
     }
