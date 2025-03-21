@@ -1,0 +1,41 @@
+[versions]
+agp = "8.9.0"
+kotlin = "2.1.20"
+camerax = "1.4.1"
+coreKtx = "1.15.0"
+activityKtx = "1.10.1"
+appcompat = "1.7.0"
+material = "1.12.0"
+material3 = "1.3.1"  # Latest Material 3 version
+constraintlayout = "2.2.1"
+lifecycle = "2.8.7"
+monitor = "1.7.2"
+junitKtx = "1.2.1"
+srt = "1.5.4"
+
+# Libraries
+[libraries]
+# AndroidX
+androidx-activity-ktx = { group = "androidx.activity", name = "activity-ktx", version.ref = "activityKtx"}
+androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
+androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
+material = { group = "com.google.android.material", name = "material", version.ref = "material" } # Key renamed
+androidx-material3 = { group = "androidx.compose.material3", name = "material3", version.ref = "material3" }
+constraintlayout = { group = "androidx.constraintlayout", name = "constraintlayout", version.ref = "constraintlayout" } # Key renamed
+lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycle" } # Key renamed
+lifecycle-viewmodel-ktx = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-ktx", version.ref = "lifecycle" }
+
+# CameraX
+camera-core = { group = "androidx.camera", name = "camera-core", version.ref = "camerax" } # Key renamed
+camera-camera2 = { group = "androidx.camera", name = "camera-camera2", version.ref = "camerax" } # Key renamed
+camera-lifecycle = { group = "androidx.camera", name = "camera-lifecycle", version.ref = "camerax" } # Key renamed
+camera-view = { group = "androidx.camera", name = "camera-view", version.ref = "camerax" }
+androidx-monitor = { group = "androidx.test", name = "monitor", version.ref = "monitor" }
+androidx-junit-ktx = { group = "androidx.test.ext", name = "junit-ktx", version.ref = "junitKtx" } # Key renamed
+
+srt = { module = "com.github.haivision:srt", version.ref = "srt" }
+
+# Plugins
+[plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }
+kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
