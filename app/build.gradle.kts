@@ -13,6 +13,10 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "1.0"
+        ndk {
+            //noinspection ChromeOsAbiSupport
+            abiFilters += "arm64-v8a"  // Only include arm64-v8a
+        }
     }
 
     buildTypes {
@@ -38,6 +42,18 @@ android {
     packaging {
         resources {
             merges += "AndroidxCamera.xml"
+        }
+    }
+
+    sourceSets {
+        getByName("main") {
+            jniLibs.srcDirs("src/main/jniLibs")
+            java.srcDirs("src/main/cpp")
+        }
+    }
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
         }
     }
 }

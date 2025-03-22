@@ -11,7 +11,6 @@ constraintlayout = "2.2.1"
 lifecycle = "2.8.7"
 monitor = "1.7.2"
 junitKtx = "1.2.1"
-srt = "1.5.4"
 
 # Libraries
 [libraries]
@@ -32,8 +31,6 @@ camera-lifecycle = { group = "androidx.camera", name = "camera-lifecycle", versi
 camera-view = { group = "androidx.camera", name = "camera-view", version.ref = "camerax" }
 androidx-monitor = { group = "androidx.test", name = "monitor", version.ref = "monitor" }
 androidx-junit-ktx = { group = "androidx.test.ext", name = "junit-ktx", version.ref = "junitKtx" } # Key renamed
-
-srt = { module = "com.github.haivision:srt", version.ref = "srt" }
 
 # Plugins
 [plugins]

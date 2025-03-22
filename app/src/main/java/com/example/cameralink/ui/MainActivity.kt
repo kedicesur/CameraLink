@@ -13,6 +13,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import com.example.cameralink.camera.CameraOperations
 import com.example.cameralink.databinding.ActivityMainBinding
+import com.example.cameralink.streaming.SrtWrapper
 
 class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
@@ -50,6 +51,14 @@ class MainActivity : AppCompatActivity() {
         if (!hasCameraPermission()) {
             requestPermissionLauncher.launch(arrayOf(Manifest.permission.CAMERA))
         }
+
+        val result = SrtWrapper.init()
+        if (result == 0) {
+            Toast.makeText(this, "SRT Initialized Successfully!", Toast.LENGTH_LONG).show()
+        } else {
+            Toast.makeText(this, "SRT Initialization Failed!", Toast.LENGTH_LONG).show()
+        }
+        Toast.makeText(this, "SRT Cleanup with result: ${SrtWrapper.cleanup()}", Toast.LENGTH_LONG).show()
     }
 
     private fun handleFlipButton() {
