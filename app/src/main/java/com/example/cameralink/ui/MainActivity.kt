@@ -52,13 +52,13 @@ class MainActivity : AppCompatActivity() {
             requestPermissionLauncher.launch(arrayOf(Manifest.permission.CAMERA))
         }
 
-        val result = SrtWrapper.init()
+        val result = SrtWrapper.srtInit()
         if (result == 0) {
             Toast.makeText(this, "SRT Initialized Successfully!", Toast.LENGTH_LONG).show()
         } else {
             Toast.makeText(this, "SRT Initialization Failed!", Toast.LENGTH_LONG).show()
         }
-        Toast.makeText(this, "SRT Cleanup with result: ${SrtWrapper.cleanup()}", Toast.LENGTH_LONG).show()
+        Toast.makeText(this, "SRT Cleanup with result: ${SrtWrapper.srtCleanup()}", Toast.LENGTH_LONG).show()
     }
 
     private fun handleFlipButton() {
