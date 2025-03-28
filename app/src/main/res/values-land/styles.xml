@@ -23,6 +23,11 @@
         <item name="iconTint">@color/flip_button_tint</item>
     </style>
 
+    <style name="Widget.CameraLink.SrtButton" parent="Widget.CameraLink.CircularButton">
+        <item name="icon">@drawable/ic_srt</item>
+        <item name="iconTint">@color/srt_button_tint</item>
+    </style>
+
     <style name="ShapeAppearanceOverlay.CameraLink.Circle" parent="ShapeAppearance.Material3.Corner.Full">
         <item name="cornerFamily">rounded</item>
         <item name="cornerSize">50%</item>

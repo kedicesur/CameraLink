@@ -41,6 +41,17 @@
             android:layout_height="@dimen/button_size"
             android:contentDescription="@string/flip_button_desc"
             app:layout_constraintStart_toEndOf="@id/powerButton"
+            app:layout_constraintEnd_toStartOf="@id/srtButton"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent"/>
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/srtButton"
+            style="@style/Widget.CameraLink.SrtButton"
+            android:layout_width="@dimen/button_size"
+            android:layout_height="@dimen/button_size"
+            android:contentDescription="@string/srt_button_desc"
+            app:layout_constraintStart_toEndOf="@id/flipButton"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintTop_toTopOf="parent"
             app:layout_constraintBottom_toBottomOf="parent"/>

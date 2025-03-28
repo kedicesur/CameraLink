@@ -1,29 +1,52 @@
 package com.example.cameralink.ui
 
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 class CameraViewModel : ViewModel() {
-    private val _isCameraEnabled = MutableLiveData(false)
-    val isCameraEnabled: LiveData<Boolean> = _isCameraEnabled
+    private val _isCameraEnabled = MutableStateFlow(false)
+    val isCameraEnabled: StateFlow<Boolean> = _isCameraEnabled.asStateFlow()
 
-    private val _isFrontCamera = MutableLiveData(false)
-    val isFrontCamera: LiveData<Boolean> = _isFrontCamera
+    private val _isFrontCamera = MutableStateFlow(false)
+    val isFrontCamera: StateFlow<Boolean> = _isFrontCamera.asStateFlow()
+
+    private val _isSrtActive = MutableStateFlow(false)
+    val isSrtActive: StateFlow<Boolean> = _isSrtActive.asStateFlow()
+
+    private val _wasSrtActive = MutableStateFlow(false)
+    val wasSrtActive: StateFlow<Boolean> = _wasSrtActive.asStateFlow()
+
+    private val _isConfigurationChanging = MutableStateFlow(false)
+    val isConfigurationChanging: StateFlow<Boolean> = _isConfigurationChanging.asStateFlow()
 
     fun setCameraEnabled(enabled: Boolean) {
         _isCameraEnabled.value = enabled
     }
 
+    fun setConfigurationChanging(changing: Boolean) {
+        _isConfigurationChanging.value = changing
+    }
+
     fun toggleCameraEnabled() {
-        _isCameraEnabled.value = _isCameraEnabled.value != true
+        _isCameraEnabled.value = !_isCameraEnabled.value
     }
-/*
-    fun setFrontCamera(front: Boolean) {
-        _isFrontCamera.value = front
-    }
-*/
+
     fun toggleFrontCamera() {
-        _isFrontCamera.value = _isFrontCamera.value != true
+        _isFrontCamera.value = !_isFrontCamera.value
+    }
+
+    fun toggleSrtActive() {
+        if (_isCameraEnabled.value) {
+            _wasSrtActive.value = _isSrtActive.value
+            _isSrtActive.value = !_isSrtActive.value
+        }
+    }
+
+    fun resetSrtActive() {
+            _wasSrtActive.value = false
+            _isSrtActive.value = false
+            println("resetSrtActive run: isActive: ${isSrtActive.value} and wasActive: ${wasSrtActive.value}")
     }
 }

@@ -39,7 +39,15 @@
             style="@style/Widget.CameraLink.FlipButton"
             android:layout_width="@dimen/button_size"
             android:layout_height="@dimen/button_size"
+            android:layout_marginBottom="@dimen/button_margin_bottom"
             android:contentDescription="@string/flip_button_desc"/>
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/srtButton"
+            style="@style/Widget.CameraLink.SrtButton"
+            android:layout_width="@dimen/button_size"
+            android:layout_height="@dimen/button_size"
+            android:contentDescription="@string/srt_button_desc"/>
 
     </LinearLayout>
 

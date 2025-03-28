@@ -2,4 +2,5 @@
     <string name="app_name">CameraLink</string>
     <string name="power_button_desc">Camera Power Button</string>
     <string name="flip_button_desc">Flip Camera Button</string>
+    <string name="srt_button_desc">SRT Toggle Button</string>
 </resources>
