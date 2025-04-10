@@ -1,71 +1,95 @@
 package com.example.cameralink.ui
 
-import android.Manifest
-import android.content.pm.PackageManager
 import android.os.Bundle
+import android.util.Log
 import android.view.GestureDetector
 import android.view.MotionEvent
+import android.view.OrientationEventListener
 import android.view.View
 import android.widget.Toast
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import kotlinx.coroutines.launch
 import com.example.cameralink.camera.CameraOperations
 import com.example.cameralink.databinding.ActivityMainBinding
+import com.example.cameralink.permissions.PermissionHandler
+import com.example.cameralink.streaming.SrtStreamer
 import com.example.cameralink.streaming.SrtWrapper
 
+private const val TAG = "MainActivity"
+
 class MainActivity : AppCompatActivity() {
-    private var _binding: ActivityMainBinding? = null
-    private val binding get() = _binding!!
+    private lateinit var binding: ActivityMainBinding
+
+    private val srtStreamer by lazy {
+        SrtStreamer(this)
+    }
 
     private val cameraViewModel: CameraViewModel by viewModels()
 
     private val cameraOperations by lazy {
-        CameraOperations(this, this, cameraViewModel)
+        CameraOperations(this, cameraViewModel)
     }
+    private var orientationListener: OrientationEventListener? = null
 
-    private val requestPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions()
-    ) { permissions ->
-        if (permissions[Manifest.permission.CAMERA] == true) {
-            startCameraIfEnabled()
-        } else {
-            cameraViewModel.setCameraEnabled(false)
-            showPermissionWarning()
-        }
-    }
+    private val permissionHandler by lazy { PermissionHandler(this) }
+    private var wasCameraEnabled = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        _binding = ActivityMainBinding.inflate(layoutInflater)
+        binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        setupUI()
-        setupStateCollectors()
-        checkCameraPermission()
+        // Initially disable all UI interactions except Power button
+        with(binding) {
+            flipButton.isEnabled = false
+            srtButton.isEnabled = false
+        }
+
+        lifecycleScope.launch {
+            Log.d(TAG, "Starting permission handling")
+            // Suspend until permission is handled
+            if (permissionHandler.handlePermissions()) {
+                // Only setup if permission granted
+                Log.d(TAG, "Permission granted, setting up UI")
+                setupUI()
+                setupStateCollectors()
+                setupOrientationListener()
+            }
+        }
     }
 
     override fun onPause() {
         super.onPause()
+        Log.d(TAG, "onPause called")
         if (isChangingConfigurations) {
             cameraViewModel.setConfigurationChanging(true)
         }
+        wasCameraEnabled = cameraViewModel.isCameraEnabled.value
+        cameraViewModel.setCameraEnabled(false)
+        orientationListener?.disable()
     }
 
     override fun onResume() {
         super.onResume()
+        Log.d(TAG, "onResume called")
+        if (wasCameraEnabled) {
+            cameraViewModel.setCameraEnabled(true)
+        }
+        wasCameraEnabled = false
         cameraViewModel.setConfigurationChanging(false)
+        orientationListener?.enable()
     }
 
     override fun onDestroy() {
         super.onDestroy()
+        Log.d(TAG, "onDestroy called")
+        permissionHandler.cleanup()
         cameraOperations.close()
-        _binding = null
+        orientationListener?.disable()
     }
 
     private fun setupUI() {
@@ -82,13 +106,14 @@ class MainActivity : AppCompatActivity() {
             lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launch {
                     cameraViewModel.isCameraEnabled.collect { isEnabled ->
+                        updateButtonStates()
                         when (isEnabled) {
                             true -> {
                                 binding.previewView.visibility = View.VISIBLE
-                                cameraOperations.startCamera(binding.previewView)
+                                cameraOperations.startCamera(binding.previewView.holder)
                             }
                             false -> {
-                                println("isCameraEnabled collector triggered with isSrtActive: ${cameraViewModel.isSrtActive.value} and wasSrtActive: ${cameraViewModel.wasSrtActive.value}")
+                                Log.d(TAG, "isCameraEnabled reset and Camera disabled")
                                 binding.previewView.visibility = View.INVISIBLE
                                 cameraOperations.close()
                                 if (cameraViewModel.isSrtActive.value) {
@@ -97,7 +122,6 @@ class MainActivity : AppCompatActivity() {
                                 }
                             }
                         }
-                        updateButtonStates()
                     }
                 }
 
@@ -111,17 +135,39 @@ class MainActivity : AppCompatActivity() {
 
                 launch {
                     cameraViewModel.isSrtActive.collect { isActive ->
-                        println("isSrtActive collector triggered: isActive: $isActive and wasActive: ${cameraViewModel.wasSrtActive.value}")
-                        if (!cameraViewModel.isConfigurationChanging.value && (isActive xor cameraViewModel.wasSrtActive.value)) {
+                        if (!cameraViewModel.isConfigurationChanging.value &&
+                            (isActive xor cameraViewModel.wasSrtActive.value)
+                        ) {
                             handleSrtState(isActive)
                         }
-                        // cameraViewModel.setConfigurationChanging(false)
                         binding.srtButton.isActivated = isActive
                         updateButtonStates()
                     }
                 }
             }
         }
+    }
+
+    private fun setupOrientationListener() {
+        orientationListener = object : OrientationEventListener(this) {
+            override fun onOrientationChanged(orientation: Int) {
+                when {
+                    orientation in 45..135 || orientation in 225..315 -> {
+                        supportActionBar?.let {
+                            if (it.isShowing) it.hide()
+                            window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LAYOUT_STABLE // Needed for Min API 29
+                        }
+                    }
+                    else -> {
+                        supportActionBar?.let {
+                            if (!it.isShowing) it.show()
+                            window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                        }
+                    }
+                }
+            }
+        }
+        orientationListener?.enable()
     }
 
     private fun handleSrtState(isEnabled: Boolean) {
@@ -138,19 +184,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun checkCameraPermission() {
-        if (!hasCameraPermission()) {
-            requestPermissionLauncher.launch(arrayOf(Manifest.permission.CAMERA))
-        }
-    }
-
-    private fun startCameraIfEnabled() {
-        if (cameraViewModel.isCameraEnabled.value) {
-            binding.previewView.visibility = View.VISIBLE
-            cameraOperations.startCamera(binding.previewView)
-        }
-    }
-
     private fun setupGestureDetector() {
         val gestureDetector = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
             override fun onScroll(
@@ -160,8 +193,8 @@ class MainActivity : AppCompatActivity() {
                 distanceY: Float
             ): Boolean {
                 if (e1 == null || !cameraViewModel.isCameraEnabled.value) return false
-                val sensitivity = binding.previewView.height.toFloat()
-                val zoomFactor = 1f + distanceY / sensitivity
+                val sensitivity = binding.previewView.width.toFloat()
+                val zoomFactor = 1f + distanceX / sensitivity
                 cameraOperations.adjustZoom(zoomFactor)
                 return true
             }
@@ -183,13 +216,5 @@ class MainActivity : AppCompatActivity() {
             flipButton.isEnabled = isCameraOn
             srtButton.isEnabled = isCameraOn
         }
-    }
-
-    private fun hasCameraPermission(): Boolean =
-        ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) ==
-                PackageManager.PERMISSION_GRANTED
-
-    private fun showPermissionWarning() {
-        Toast.makeText(this, "Camera permission required", Toast.LENGTH_SHORT).show()
     }
 }

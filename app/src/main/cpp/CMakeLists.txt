@@ -7,4 +7,10 @@ set_target_properties(srt PROPERTIES IMPORTED_LOCATION ${CMAKE_SOURCE_DIR}/../jn
 include_directories(${CMAKE_SOURCE_DIR}/include)
 
 add_library(srt_wrapper SHARED srt_wrapper.cpp)
-target_link_libraries(srt_wrapper srt log)
+target_link_libraries(srt_wrapper
+        PRIVATE
+        srt
+        log
+        android
+        c++_shared
+)

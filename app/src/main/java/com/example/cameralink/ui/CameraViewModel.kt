@@ -5,6 +5,16 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
+data class StreamingPresets(
+    val host: String = "192.168.1.24",
+    val port: Int = 3684,
+    val width: Int = 1920,
+    val height: Int = 1080,
+    val fps: Int = 30,
+    val bitrate: Int = 4_000_000,
+    val iFrameInterval: Int = 2
+)
+
 class CameraViewModel : ViewModel() {
     private val _isCameraEnabled = MutableStateFlow(false)
     val isCameraEnabled: StateFlow<Boolean> = _isCameraEnabled.asStateFlow()
@@ -20,6 +30,8 @@ class CameraViewModel : ViewModel() {
 
     private val _isConfigurationChanging = MutableStateFlow(false)
     val isConfigurationChanging: StateFlow<Boolean> = _isConfigurationChanging.asStateFlow()
+
+    val streamingPresets = StreamingPresets()
 
     fun setCameraEnabled(enabled: Boolean) {
         _isCameraEnabled.value = enabled
