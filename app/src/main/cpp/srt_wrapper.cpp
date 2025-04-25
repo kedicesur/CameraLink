@@ -11,7 +11,7 @@ static std::atomic<int> srtInitCount(0);
 
 extern "C" {
 
-    JNIEXPORT jint JNICALL Java_com_example_cameralink_streaming_SrtWrapper_srtInit(JNIEnv*, jobject) {
+    JNIEXPORT jint JNICALL Java_com_example_cameralink_streaming_SrtWrapper_srtInit(JNIEnv *, jobject) {
         if (srtInitCount.fetch_add(1) == 0) {
             LOGI("Initializing SRT library");
             int ret = srt_startup();
@@ -25,7 +25,7 @@ extern "C" {
         return 0;
     }
 
-    JNIEXPORT jint JNICALL Java_com_example_cameralink_streaming_SrtWrapper_srtCreateSocket(JNIEnv*, jobject) {
+    JNIEXPORT jint JNICALL Java_com_example_cameralink_streaming_SrtWrapper_srtCreateSocket(JNIEnv*, jobject, jint latency) {
         SRTSOCKET sock = srt_create_socket();
         if (sock == SRT_INVALID_SOCK) {
             LOGE("Socket creation error: %s", srt_getlasterror_str());
@@ -35,7 +35,7 @@ extern "C" {
         // Essential caller mode configuration
         int yes = 1;
         srt_setsockopt(sock, 0, SRTO_SENDER, &yes, sizeof(yes));
-        int latency = 125; // 125ms latency
+        // int latency = 125; // 125ms latency
         srt_setsockopt(sock, 0, SRTO_LATENCY, &latency, sizeof(latency));
 
         return static_cast<jint>(sock);
@@ -62,6 +62,12 @@ extern "C" {
         for (auto* ai = res; ai != nullptr; ai = ai->ai_next) {
             conn_res = srt_connect(sock, ai->ai_addr, ai->ai_addrlen);
             if (conn_res != SRT_ERROR) break;
+        }
+
+        if (conn_res == SRT_ERROR) {
+            int error_code = srt_getlasterror(nullptr);
+            const char* error_msg = srt_getlasterror_str();
+            LOGE("SRT connection failed. Error code: %d, Message: %s", error_code, error_msg);
         }
 
         freeaddrinfo(res);

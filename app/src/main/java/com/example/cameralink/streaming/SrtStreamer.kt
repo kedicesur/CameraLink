@@ -1,220 +1,193 @@
 package com.example.cameralink.streaming
 
-import android.content.Context
 import android.media.MediaCodec
 import android.media.MediaFormat
 import android.util.Log
 import android.view.Surface
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
 import java.nio.ByteBuffer
 
-class SrtStreamer(
-    private val context: Context
-) {
+private const val TAG = "SrtStreamer"
+
+class SrtStreamer {
     private var encoder: H265Encoder? = null
     private var socketId: Int = -1
-    private var currentHost: String = "192.168.1.24"
-    private var currentPort: Int = 3684
+
+    @Volatile
     private var isStreaming = false
     private var reconnectAttempts = 0
     private val maxReconnectAttempts = 3
-    private var bytesSent: Long = 0
-    private var framesSent: Long = 0
-    private val reconnectDelay = longArrayOf(1000, 2000, 4000) // Exponential backoff
+    private val reconnectDelay = listOf(1_000L, 2_000L, 4_000L)
+
+    // A dedicated scope for reconnect/backoff logic, automatically cancelled on stop()
     private var reconnectScope: CoroutineScope? = null
-    private var currentReconnectDelay = 0
 
-    private fun initializeSrtSocket(): Boolean {
-        return try {
-            val initResult = SrtWrapper.srtInit()
-            if (initResult != 0) throw Exception("SRT initialization failed")
+    // Store host, port, and latency as properties
+    private var host: String = ""
+    private var port: Int = 0
+    private var latency: Int = 0
 
-            socketId = SrtWrapper.srtCreateSocket()
-
-            val result = SrtWrapper.srtConnect(socketId,currentHost,currentPort)
-            if (result < 0) throw RuntimeException("SRT failed to connect in Caller mode")
-            Log.i("SRT", "Socket connected successfully")
-            true
-        } catch (e: Exception) {
-            Log.e("SRT", "Socket error: ${e.message}")
-            SrtWrapper.srtClose(socketId)
-            socketId = -1
-            false
-        }
-    }
-
-    private fun initializeEncoder(
-        surface: Surface,
+    /**
+     * Starts the SRT+HEVC pipeline.
+     * Must be called from a coroutine (e.g. viewModelScope.launch).
+     */
+    suspend fun start(
+        surface: Surface?,
+        host: String,
+        port: Int,
+        latency: Int,
         width: Int,
         height: Int,
         fps: Int,
         bitrate: Int,
         iFrameInterval: Int
-    ) {
-        encoder = H265Encoder(
-            context = context,
-            width = width,
-            height = height,
-            frameRate = fps,
-            bitrate = bitrate,
-            iFrameInterval = iFrameInterval
-        ).apply {
-            setCallback(object : H265Encoder.EncoderCallback {
-                override fun onOutputBufferAvailable(buffer: ByteBuffer, info: MediaCodec.BufferInfo) {
-                    sendVideoData(buffer, info)
-                }
+    ) = withContext(Dispatchers.IO) {
+        require(!isStreaming) { "Already streaming" }
+        require(bitrate in 500_000..50_000_000) { "Bitrate out of range" }
+        require(iFrameInterval in 1..10)        { "Invalid GOP size" }
 
-                override fun onFormatChanged(format: MediaFormat) {
-                    sendCodecHeaders(format)
-                }
+        // Save host, port, and latency
+        this@SrtStreamer.host = host
+        this@SrtStreamer.port = port
+        this@SrtStreamer.latency = latency
 
-                override fun onEncoderError(errorCode: Int, errorMessage: String) {
-                    handleEncoderError(errorCode, errorMessage)
-                }
-            })
-            start(surface)
+        // 1) Init SRT socket
+        if (!initSrt(host, port, latency)) {
+            throw RuntimeException("Failed to connect SRT socket")
+        }
+
+        // 2) Init encoder
+        encoder = H265Encoder(width, height, fps, bitrate, iFrameInterval)
+            .apply {
+                setCallback(object : H265Encoder.EncoderCallback {
+                    override fun onOutputBufferAvailable(buffer: ByteBuffer, info: MediaCodec.BufferInfo) {
+                        Log.d(TAG, "onOutputBufferAvailable: size=${info.size}")
+                        sendVideoData(buffer, info)
+                    }
+                    override fun onFormatChanged(format: MediaFormat) {
+                        sendCodecHeaders(format)
+                    }
+                    override fun onEncoderError(code: Int, msg: String) {
+                        Log.e(TAG, "Encoder error: $msg")
+                        stop()  // safely tear down
+                    }
+                })
+                start(surface)
+            }
+
+       isStreaming = true
+        reconnectAttempts = 0
+
+        // Prepare a reconnect scope for later if needed
+        reconnectScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    }
+
+    /**
+     * Stops streaming, tears down encoder, sockets & coroutines.
+     */
+    suspend fun stop() = withContext(Dispatchers.IO) {
+            if (!isStreaming) return@withContext
+            isStreaming = false
+
+        // 1) Stop encoder & release surface
+        encoder?.stop()
+        encoder = null
+
+        // 2) Cancel any pending reconnect attempts
+        reconnectScope?.cancel()
+        reconnectScope = null
+
+        // 3) Close SRT socket and clean up srt library
+        if (socketId >= 0) {
+            SrtWrapper.srtClose(socketId)
+            socketId = -1
+            SrtWrapper.srtCleanup()
+        }
+
+        reconnectAttempts = 0
+    }
+
+    private fun initSrt(host: String, port: Int, latency: Int): Boolean {
+        Log.i(TAG, "Initializing SRT socket with host: $host, port: $port, latency: $latency")
+        try {
+            if (SrtWrapper.srtInit() != 0) {
+                Log.e(TAG, "Failed to initialize SRT library")
+                return false
+            }
+            socketId = SrtWrapper.srtCreateSocket(latency)
+            Log.i(TAG, "SRT socket ID: $socketId")
+            if (socketId < 0) {
+                Log.e(TAG, "Failed to create SRT socket")
+                return false
+            }
+            if (SrtWrapper.srtConnect(socketId, host, port) < 0) {
+                Log.e(TAG, "Failed to connect SRT socket to $host:$port")
+                SrtWrapper.srtClose(socketId)
+                socketId = -1
+                return false
+            }
+            return true
+        } catch (e: Exception) {
+            Log.e(TAG, "SRT initialization error: ${e.message}")
+            if (socketId >= 0) SrtWrapper.srtClose(socketId)
+            return false
+        } finally {
+            if (socketId < 0) {
+                SrtWrapper.srtCleanup()
+            }
         }
     }
 
     private fun sendVideoData(buffer: ByteBuffer, info: MediaCodec.BufferInfo) {
         if (!isStreaming || socketId < 0) return
-
         try {
-            buffer.apply {
-                position(info.offset)
-                limit(info.offset + info.size)
-            }
-
-            val data = ByteArray(info.size).apply {
-                buffer.get(this, 0, info.size)
-            }
-
-            val sent = SrtWrapper.srtSend(socketId, data, data.size)
-            if (sent < 0) handleSendError() // Only handle complete failures
-            else {
-                bytesSent += data.size // Count as sent, let SRT handle retries
-                framesSent++
+            if (info.size > 0) {
+                val data = ByteArray(info.size)
+                synchronized(buffer) {
+                    buffer.get(data, info.offset, info.size)
+                }
+                val result = SrtWrapper.srtSend(socketId, data, data.size)
+                if (result < 0) handleSendError()
             }
         } catch (e: Exception) {
-            Log.e("SRT", "Send error: ${e.message}")
-            handleSendError()
+            Log.e(TAG, "Error sending video data: ${e.message}")
         }
     }
 
     private fun handleSendError() {
-        if (reconnectAttempts++ < maxReconnectAttempts) {
-            Log.i("SRT", "Reconnecting attempt $reconnectAttempts/$maxReconnectAttempts")
-            reconnectSocket()
+        if (reconnectScope?.isActive != true) return // Ensure scope is active
+        if (reconnectAttempts++ >= maxReconnectAttempts) {
+            Log.e(TAG, "Max reconnect attempts reached. Stopping streaming.")
+            reconnectScope?.launch {
+                stop()
+            }
+            return
         } else {
-            stop()
-            Log.e("SRT", "Permanent send failure")
-        }
-    }
-
-    private fun reconnectSocket() {
-        if (socketId >= 0) {
-            SrtWrapper.srtClose(socketId)
-            socketId = -1
-        }
-
-        reconnectScope?.launch {
-            if (currentReconnectDelay >= reconnectDelay.size) {
-                Log.e("SRT", "Max reconnect attempts reached")
-                return@launch
-            }
-
-            delay(reconnectDelay[currentReconnectDelay])
-            currentReconnectDelay++
-
-            if (initializeSrtSocket()) {
-                currentReconnectDelay = 0
-                Log.i("SRT", "Reconnected successfully")
-            }
-        }
-    }
-
-    private fun sendCodecHeaders(format: MediaFormat) {
-        if (!isStreaming) return
-
-        // HEVC requires VPS(csd-0), SPS(csd-1), PPS(csd-2)
-        listOf("csd-0", "csd-1", "csd-2").forEach { key ->
-            format.getByteBuffer(key)?.let { buffer ->
-                try {
-                    val headerData = ByteArray(buffer.remaining()).apply {
-                        buffer.get(this)
-                    }
-                    if (SrtWrapper.srtSend(socketId, headerData, headerData.size) == -1) throw Exception("SRT send failed")
-                } catch (e: Exception) {
-                    Log.e("SRT", "Header send error: ${e.message}")
+            val delayMs = reconnectDelay.getOrElse(reconnectAttempts - 1) { 4_000L }
+            reconnectScope?.launch {
+                delay(delayMs)
+                val reconnected = synchronized(this@SrtStreamer) {
+                    if (socketId >= 0) SrtWrapper.srtClose(socketId)
+                    initSrt(host, port, latency)
+                }
+                if (!reconnected){
+                    Log.e(TAG, "Error sending data. Attempt $reconnectAttempts of $maxReconnectAttempts")
+                    handleSendError()
                 }
             }
         }
     }
 
-    private fun handleEncoderError(errorCode: Int, errorMessage: String) {
-        Log.e("ENCODER", "Error $errorCode: $errorMessage")
-        stop() // Simply stop on any encoder error
-    }
-
-    fun start(
-        surface: Surface,
-        host: String,
-        port: Int,
-        width: Int,
-        height: Int,
-        fps: Int,
-        bitrate: Int = 2_000_000,
-        iFrameInterval: Int
-    ) {
-        require(bitrate in 500_000..50_000_000) { "Invalid bitrate" }
-        require(iFrameInterval in 1..10) { "Invalid GOP size" }
-        Log.i("SRT", "Starting stream with params:")
-        Log.i("SRT", "Resolution: ${width}x$height")
-        Log.i("SRT", "Frame rate: $fps fps")
-        Log.i("SRT", "Bitrate: ${bitrate/1_000_000} Mbps")
-        if (isStreaming) {
-            Log.w("SRT", "Streaming already active")
-            return
-        }
-
-        reconnectScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-        currentHost = host
-        currentPort = port
-
-        if (!initializeSrtSocket()) return
-
-        initializeEncoder(surface, width, height, fps, bitrate, iFrameInterval)
-        isStreaming = true
-    }
-
-    fun stop() {
-        isStreaming = false // Set first to prevent new data
-        encoder?.stop()
-        encoder = null
-        reconnectScope?.cancel()
-        reconnectScope = null
-
-        if (socketId >= 0) {
-            SrtWrapper.srtClose(socketId)
-            socketId = -1
-        }
-
-        bytesSent = 0
-        framesSent = 0
-        reconnectAttempts = 0
-        currentReconnectDelay = 0
-
-        try {
-            SrtWrapper.srtCleanup()
-        } catch (e: Exception) {
-            Log.e("SRT", "Cleanup error: ${e.message}")
+    private fun sendCodecHeaders(format: MediaFormat) {
+        listOf("csd-0", "csd-1", "csd-2").forEach { key ->
+            format.getByteBuffer(key)?.let { buf ->
+                val hdr = ByteArray(buf.remaining()).also { buf.get(it) }
+                val result = SrtWrapper.srtSend(socketId, hdr, hdr.size)
+                if (result < 0) {
+                    Log.e(TAG, "Failed to send codec header $key. Error code: $result")
+                    handleSendError()
+                }
+            }
         }
     }
-
-    fun getStreamStats() = "Sent: $framesSent frames (${bytesSent/1024}KB)"
 }

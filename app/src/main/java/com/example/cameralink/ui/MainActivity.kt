@@ -1,10 +1,14 @@
 package com.example.cameralink.ui
 
+import android.content.Context
+import android.content.IntentFilter
+import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import android.view.GestureDetector
 import android.view.MotionEvent
 import android.view.OrientationEventListener
+import android.os.*
 import android.view.View
 import android.widget.Toast
 import androidx.activity.viewModels
@@ -16,32 +20,54 @@ import kotlinx.coroutines.launch
 import com.example.cameralink.camera.CameraOperations
 import com.example.cameralink.databinding.ActivityMainBinding
 import com.example.cameralink.permissions.PermissionHandler
-import com.example.cameralink.streaming.SrtStreamer
-import com.example.cameralink.streaming.SrtWrapper
 
 private const val TAG = "MainActivity"
+private const val DEFAULT_TEMPERATURE = 35f
+
+interface TemperatureProvider {
+    fun getDeviceTemperature(): Float
+}
+
+class DefaultTemperatureProvider(private val context: Context) : TemperatureProvider {
+    override fun getDeviceTemperature(): Float {
+        return try {
+            val batteryIntent = context.registerReceiver(
+                null,
+                IntentFilter(Intent.ACTION_BATTERY_CHANGED)
+            )
+            when (val temp = batteryIntent?.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, 0)) {
+                0, null -> DEFAULT_TEMPERATURE  // Default if unavailable
+                else -> temp / 10f
+            }
+        } catch (e: SecurityException) {
+            Log.w("TemperatureProvider", "Battery access denied", e)
+            DEFAULT_TEMPERATURE
+        } catch (e: Exception) {
+            Log.e("TemperatureProvider", "Temperature read failed", e)
+            DEFAULT_TEMPERATURE
+        }
+    }
+}
+
+object TemperatureProviderHolder {
+    lateinit var temperatureProvider: TemperatureProvider
+}
 
 class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
-
-    private val srtStreamer by lazy {
-        SrtStreamer(this)
-    }
-
     private val cameraViewModel: CameraViewModel by viewModels()
-
     private val cameraOperations by lazy {
         CameraOperations(this, cameraViewModel)
     }
     private var orientationListener: OrientationEventListener? = null
-
     private val permissionHandler by lazy { PermissionHandler(this) }
-    private var wasCameraEnabled = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        TemperatureProviderHolder.temperatureProvider = DefaultTemperatureProvider(this@MainActivity)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        cameraViewModel.setCameraOperations(cameraOperations)
 
         // Initially disable all UI interactions except Power button
         with(binding) {
@@ -50,10 +76,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         lifecycleScope.launch {
-            Log.d(TAG, "Starting permission handling")
-            // Suspend until permission is handled
             if (permissionHandler.handlePermissions()) {
-                // Only setup if permission granted
                 Log.d(TAG, "Permission granted, setting up UI")
                 setupUI()
                 setupStateCollectors()
@@ -65,22 +88,18 @@ class MainActivity : AppCompatActivity() {
     override fun onPause() {
         super.onPause()
         Log.d(TAG, "onPause called")
-        if (isChangingConfigurations) {
-            cameraViewModel.setConfigurationChanging(true)
-        }
-        wasCameraEnabled = cameraViewModel.isCameraEnabled.value
-        cameraViewModel.setCameraEnabled(false)
+        cameraViewModel.setCameraEnabled(false) // first sets wasCameraEnabled to isCameraEnabled.value
+        if (cameraViewModel.isSrtActive.value) cameraViewModel.toggleSrtActive()
         orientationListener?.disable()
     }
 
     override fun onResume() {
         super.onResume()
         Log.d(TAG, "onResume called")
-        if (wasCameraEnabled) {
-            cameraViewModel.setCameraEnabled(true)
+        if (cameraViewModel.wasCameraEnabled.value) cameraViewModel.setCameraEnabled(true) // first sets wasCameraEnabled to isCameraEnabled.value
+        if (cameraViewModel.wasSrtActive.value) {
+            Toast.makeText(this, "Resuming SRT streaming", Toast.LENGTH_SHORT).show()
         }
-        wasCameraEnabled = false
-        cameraViewModel.setConfigurationChanging(false)
         orientationListener?.enable()
     }
 
@@ -90,6 +109,7 @@ class MainActivity : AppCompatActivity() {
         permissionHandler.cleanup()
         cameraOperations.close()
         orientationListener?.disable()
+        cameraViewModel.resetSrtActive()
     }
 
     private fun setupUI() {
@@ -118,7 +138,6 @@ class MainActivity : AppCompatActivity() {
                                 cameraOperations.close()
                                 if (cameraViewModel.isSrtActive.value) {
                                     cameraViewModel.resetSrtActive()
-                                    handleSrtState(false)
                                 }
                             }
                         }
@@ -132,16 +151,11 @@ class MainActivity : AppCompatActivity() {
                         }
                     }
                 }
-
                 launch {
-                    cameraViewModel.isSrtActive.collect { isActive ->
-                        if (!cameraViewModel.isConfigurationChanging.value &&
-                            (isActive xor cameraViewModel.wasSrtActive.value)
-                        ) {
-                            handleSrtState(isActive)
+                    cameraViewModel.srtToastMessage.collect { message ->
+                        message?.let {
+                            Toast.makeText(this@MainActivity, it, Toast.LENGTH_SHORT).show()
                         }
-                        binding.srtButton.isActivated = isActive
-                        updateButtonStates()
                     }
                 }
             }
@@ -168,20 +182,6 @@ class MainActivity : AppCompatActivity() {
             }
         }
         orientationListener?.enable()
-    }
-
-    private fun handleSrtState(isEnabled: Boolean) {
-        when (isEnabled) {
-            true -> {
-                val result = SrtWrapper.srtInit()
-                Toast.makeText(this, "SRT Started: $result", Toast.LENGTH_SHORT).show()
-            }
-            false -> {
-                SrtWrapper.srtClose(0)
-                SrtWrapper.srtCleanup()
-                Toast.makeText(this, "SRT Stopped", Toast.LENGTH_SHORT).show()
-            }
-        }
     }
 
     private fun setupGestureDetector() {
@@ -211,10 +211,12 @@ class MainActivity : AppCompatActivity() {
 
     private fun updateButtonStates() {
         val isCameraOn = cameraViewModel.isCameraEnabled.value
+        val isSrtOn = cameraViewModel.isSrtActive.value
         with(binding) {
             powerButton.isActivated = isCameraOn
             flipButton.isEnabled = isCameraOn
             srtButton.isEnabled = isCameraOn
+            srtButton.isActivated = isSrtOn
         }
     }
 }

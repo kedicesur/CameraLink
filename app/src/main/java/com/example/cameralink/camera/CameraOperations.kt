@@ -16,6 +16,9 @@ import com.example.cameralink.ui.CameraViewModel
 import java.util.concurrent.Executors
 
 private const val TAG = "CameraOperations"
+private const val PREVIEW_WIDTH = 1920
+private const val PREVIEW_HEIGHT = 1080
+
 
 class CameraOperations(
     private val context: Context,
@@ -106,9 +109,6 @@ class CameraOperations(
                     } ?: throw IllegalStateException("HandlerThread looper is null")
                 }
             }
-        }
-
-        synchronized(this) {
             if (cameraExecutor.isShutdown) {
                 cameraExecutor = Executors.newSingleThreadExecutor()
             }
@@ -129,6 +129,10 @@ class CameraOperations(
         val surfaces = mutableListOf<Surface>()
         previewSurface?.let { surfaces.add(it) }
         if (currentSessionType == SessionType.PREVIEW_AND_ENCODER) {
+            if (encoderSurface == null || !encoderSurface!!.isValid) {
+                Log.e(TAG, "Encoder surface is null or invalid")
+                return
+            }
             encoderSurface?.let { surfaces.add(it) }
         }
         if (surfaces.isEmpty()) return
@@ -142,7 +146,9 @@ class CameraOperations(
                     startPreviewRequest()
                 }
 
-                override fun onConfigureFailed(session: CameraCaptureSession) {}
+                override fun onConfigureFailed(session: CameraCaptureSession) {
+                    Log.d(TAG, "CameraCaptureSession configuration failed")
+                }
             }
 
             val outputConfigs = surfaces.map { OutputConfiguration(it) }
@@ -153,7 +159,9 @@ class CameraOperations(
                 sessionCallback
             )
             camera.createCaptureSession(sessionConfig)
-        } catch (_: CameraAccessException) {}
+        } catch (e: CameraAccessException) {
+            Log.e(TAG, "Failed to create capture session", e)
+        }
     }
 
     private fun startPreviewRequest() {
@@ -190,7 +198,7 @@ class CameraOperations(
 
     private fun handleValidSurface() {
         previewSurface = currentSurfaceHolder?.surface
-        currentSurfaceHolder?.setFixedSize(1920,1080)
+        currentSurfaceHolder?.setFixedSize(PREVIEW_WIDTH, PREVIEW_HEIGHT)
         startOrUpdateSession()
     }
 
@@ -206,7 +214,7 @@ class CameraOperations(
         cameraDevice = null
     }
 
-    fun setEncoderSurface(surface: Surface) {
+    fun setEncoderSurface(surface: Surface?) {
         encoderSurface?.release()
         encoderSurface = surface
         currentSessionType = SessionType.PREVIEW_AND_ENCODER
